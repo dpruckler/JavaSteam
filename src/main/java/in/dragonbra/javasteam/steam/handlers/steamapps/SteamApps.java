@@ -51,6 +51,12 @@ public class SteamApps extends ClientMsgHandler {
                 handleVACBanStatus(packetMsg);
             }
         });
+        dispatchMap.put(EMsg.ClientRequestEncryptedAppTicketResponse, new Consumer<IPacketMsg>() {
+            @Override
+            public void accept(IPacketMsg packetMsg) {
+                handleEncryptedAppTicketResponse(packetMsg);
+            }
+        });
         dispatchMap.put(EMsg.ClientGetAppOwnershipTicketResponse, new Consumer<IPacketMsg>() {
             @Override
             public void accept(IPacketMsg packetMsg) {
@@ -101,6 +107,26 @@ public class SteamApps extends ClientMsgHandler {
         });
 
         dispatchMap = Collections.unmodifiableMap(dispatchMap);
+    }
+
+    /**
+     * Requests an encrypted app ticket for the specified AppID.
+     * Results are returned in a {@link EncryptedAppTicketCallback} callback.
+     *
+     * @param appId The appid to request the encrypted app ticket of.
+     * @return The Job ID of the request. This can be used to find the appropriate {@link EncryptedAppTicketCallback}.
+     */
+    public JobID getEncryptedAppTicket(int appId) {
+        ClientMsgProtobuf<CMsgClientRequestEncryptedAppTicket.Builder> request =
+                new ClientMsgProtobuf<>(CMsgClientRequestEncryptedAppTicket.class, EMsg.ClientRequestEncryptedAppTicket);
+        JobID jobID = client.getNextJobID();
+        request.setSourceJobID(jobID);
+
+        request.getBody().setAppId(appId);
+
+        client.send(request);
+
+        return jobID;
     }
 
     /**
@@ -490,6 +516,13 @@ public class SteamApps extends ClientMsgHandler {
         if (dispatcher != null) {
             dispatcher.accept(packetMsg);
         }
+    }
+
+    private void handleEncryptedAppTicketResponse(IPacketMsg packetMsg) {
+        ClientMsgProtobuf<CMsgClientRequestEncryptedAppTicketResponse.Builder> ticketResponse =
+                new ClientMsgProtobuf<>(CMsgClientRequestEncryptedAppTicketResponse.class, packetMsg);
+
+        client.postCallback(new EncryptedAppTicketCallback(ticketResponse.getTargetJobID(), ticketResponse.getBody()));
     }
 
     private void handleAppOwnershipTicketResponse(IPacketMsg packetMsg) {
